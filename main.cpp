@@ -10,27 +10,42 @@
 using namespace std;
 
 
-class Node
-{
-public:
-	int index;
-	int cardinality; 
-	bool * neighbours;
-};
-
 
 class Graph
 {
 
 
 private:
+
+    class Node
+    {
+    public:
+        int index;
+        int cardinality; 
+        bool * neighbours;
+    };
+
+    
+/*    class CPT
+    {
+    private:
+        int * node_seq;
+
+    public:
+        // CPT multiply(CPT cpt2)
+        // CPT eliminate(int node)
+        // 
+    };
+    
+*/
+
     int num_nodes ;
     int num_edges ;
     Node * NodeArray;
 
 public:
 
-    void parse(string fileName)
+    void parseGraph(string fileName)
     {
         ifstream inf(fileName.c_str());
         int line_no = 1;
@@ -74,7 +89,12 @@ public:
             line_no++;
         }
     }
+/*
+    void parseCPT(string fileName)
+    {
 
+    }
+*/
     void printParameters()
     {
     	cout << "Num of nodes : " << num_nodes << endl;
@@ -91,10 +111,12 @@ public:
     }
 };
 
+
+
 int main()
 {
     Graph myGraph;
-    myGraph.parse("samplegraph.txt");
+    myGraph.parseGraph("samplegraph.txt");
 	myGraph.printParameters();
 
     return 0;
