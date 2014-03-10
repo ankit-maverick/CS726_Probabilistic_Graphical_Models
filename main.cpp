@@ -128,13 +128,9 @@ public:
                 }
                 cout << key << endl;
                 factors[key] = CPT();
-                cout << "Nodes-1" << endl;
                 factors[key].node_seq = new int[strs.size() - 1];
-                cout << "Nodes-2" << endl;
                 factors[key].cardinality_seq = new int[strs.size() - 1];
-                cout << "Nodes-3" << endl;
                 factors[key].cardinality_prod_seq = new int[strs.size() - 1];
-                cout << "Nodes-4" << endl;
                 int len_potentials = 1;
                 for (int i=1; i<strs.size(); i++){
                     factors[key].node_seq[i - 1] = atoi(strs.at(i).c_str());
@@ -142,26 +138,18 @@ public:
                     factors[key].cardinality_prod_seq[i - 1] = len_potentials;
                     len_potentials = len_potentials * NodeArray[factors[key].node_seq[i - 1]].cardinality;
                 }
-                cout << "Nodes-5" << endl;
                 factors[key].potentials = new float[len_potentials];
-                cout << "Nodes-6" << endl;
             }
 
             else
             {
-                cout << "Nodes-7" << endl;
-                cout << key << endl;
                 int index = 0;
                 for (int i=0; i<strs.size()-1; i++)
                 {
-                    cout << "Iteration : " << i << endl;
-                    cout << factors[key].cardinality_prod_seq[i] << "   " << atoi(strs.at(i).c_str()) << endl;
                     index = index + factors[key].cardinality_prod_seq[i]*atoi(strs.at(i).c_str());
                 }
-                cout << "Nodes-8" << endl;
                 factors[key].potentials[index] = atof(strs.at(strs.size()-1).c_str());
-                cout << "Nodes-9" << endl;
-                cout << "Pots" << endl;
+
             }
 
         }
