@@ -5,10 +5,13 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <vector>
-
+#include <unordered_map>
+#include <cstdarg>
 
 using namespace std;
 
+
+// TODO : Implement variadic functions for set_potential and get_potential
 
 
 class Graph
@@ -26,22 +29,30 @@ private:
     };
 
     
-/*    class CPT
+    class CPT
     {
-    private:
-        int * node_seq;
-
     public:
-        // CPT multiply(CPT cpt2)
+        int * node_seq;
+        int * cardinality_seq;
+        int * cardinality_prod_seq; // used in setting potential while parsing
+        float * potentials;
+
+        /*void set_potential()
+
+        */
+        // float get_potential
+        // CPT multiply(CPT other)
         // CPT eliminate(int node)
         // 
     };
     
-*/
+
 
     int num_nodes ;
     int num_edges ;
     Node * NodeArray;
+    unordered_map <string, CPT> factors;
+
 
 public:
 
@@ -89,19 +100,81 @@ public:
             line_no++;
         }
     }
-/*
+
     void parseCPT(string fileName)
     {
+        ifstream inf(fileName.c_str());
+        int line_no = 1;
+        vector<string> strs;
+
+        if (!inf)
+        {
+            cerr << "Could not open the file " << fileName << endl;
+            exit(1);
+        }
+        string key = "";
+        while(inf)
+        {
+            std::string strInput;
+            getline(inf, strInput);
+
+            boost::split(strs, strInput, boost::is_any_of(" "));
+            
+            if (strs.at(0) == "#")
+            {
+                key = "";
+                for (int i=1; i<strs.size(); i++){
+                    key = key + strs[i];
+                }
+                cout << key << endl;
+                factors[key] = CPT();
+                cout << "Nodes-1" << endl;
+                factors[key].node_seq = new int[strs.size() - 1];
+                cout << "Nodes-2" << endl;
+                factors[key].cardinality_seq = new int[strs.size() - 1];
+                cout << "Nodes-3" << endl;
+                factors[key].cardinality_prod_seq = new int[strs.size() - 1];
+                cout << "Nodes-4" << endl;
+                int len_potentials = 1;
+                for (int i=1; i<strs.size(); i++){
+                    factors[key].node_seq[i - 1] = atoi(strs.at(i).c_str());
+                    factors[key].cardinality_seq[i - 1] = NodeArray[factors[key].node_seq[i - 1]].cardinality;
+                    factors[key].cardinality_prod_seq[i - 1] = len_potentials;
+                    len_potentials = len_potentials * NodeArray[factors[key].node_seq[i - 1]].cardinality;
+                }
+                cout << "Nodes-5" << endl;
+                factors[key].potentials = new float[len_potentials];
+                cout << "Nodes-6" << endl;
+            }
+
+            else
+            {
+                cout << "Nodes-7" << endl;
+                cout << key << endl;
+                int index = 0;
+                for (int i=0; i<strs.size()-1; i++)
+                {
+                    cout << "Iteration : " << i << endl;
+                    cout << factors[key].cardinality_prod_seq[i] << "   " << atoi(strs.at(i).c_str()) << endl;
+                    index = index + factors[key].cardinality_prod_seq[i]*atoi(strs.at(i).c_str());
+                }
+                cout << "Nodes-8" << endl;
+                factors[key].potentials[index] = atof(strs.at(strs.size()-1).c_str());
+                cout << "Nodes-9" << endl;
+                cout << "Pots" << endl;
+            }
+
+        }
 
     }
-*/
+
     void printParameters()
     {
     	cout << "Num of nodes : " << num_nodes << endl;
     	cout << "Num of edges : " << num_edges << endl;
     	for (int i = 0; i < num_nodes; i++)
     	{
-    		cout<< "Node : "<<i<<" " << NodeArray[i].cardinality<<"   -> ";
+    		cout<< "Node : "<<i<<" " << NodeArray[i].cardinality<<"   -=> ";
     		for (int j = 0; j < num_nodes; j++)
     		{
     			cout<< NodeArray[i].neighbours[j] << " ";
@@ -117,6 +190,18 @@ int main()
 {
     Graph myGraph;
     myGraph.parseGraph("samplegraph.txt");
+    myGraph.parseCPT("potentials.txt");
+/*    cout << "Enter a clique between 01 and 12 by typing the string : ";
+    string clique;
+    cin >> clique;
+    cout << "Enter the value in 0-2 1st variable takes : ";
+    int val1;
+    cin >> val1;
+    cout << "Enter the value in 0-2 2nd variable takes : ";
+    int val2;
+    cin >> val2;
+    cout << "The corresponding potential Psi_" + clique + "(" + val1 + "," + val2 + ") = " + myGraph.factors[clique].potentials
+*/
 	myGraph.printParameters();
 
     return 0;
