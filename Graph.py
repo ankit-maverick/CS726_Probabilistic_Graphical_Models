@@ -1,5 +1,6 @@
 import numpy as np
 from itertools import product
+import copy
 
 
 def _concatenate_sorted_list_of_integer_strings(l):
@@ -40,6 +41,7 @@ class Graph:
         self._num_edges = 0
         self._nodes = {}
         self._factors = {}
+        self._cliques = []
 
     class Node:
         def __init__(self, index, cardinality):
@@ -53,6 +55,50 @@ class Graph:
             self._node_set = set(node_list)
             self._cardinality_seq = []
             self._cardinality_product = 1            
+
+    def _node_mindegree(self,not_current_nodes):
+        mindegree =float("inf")
+        node_mindegree = ""
+
+        for key in self._nodes.keys():
+            if((key in not_current_nodes) == False):
+                
+                key_degree = 0
+                for index in self._nodes[key].neighbours:
+                    if((index in not_current_nodes) == False):
+                        key_degree = key_degree + 1
+                # print key, key_degree
+                
+                if(key_degree < mindegree):
+                    mindegree = key_degree
+                    node_mindegree = key
+        return node_mindegree
+
+    def _connect_clique(self, clique):
+        added_edges = 0
+        for i in clique:
+            for j in clique:
+                if((i != j) and (j not in self._nodes[i].neighbours)):
+                    print "Edge added : ",i,"-",j
+                    self._num_edges = self._num_edges + 1
+                    added_edges = added_edges + 1
+                    self._nodes[i].neighbours.add(j)
+                    self._nodes[j].neighbours.add(i)
+        return added_edges
+
+    def _maximal_cliques(self):
+        new_cliques = []
+        for i in self._cliques:
+            temp_cliques = copy.deepcopy(self._cliques)
+            temp_cliques.remove(i)
+            flag = True
+            for j in temp_cliques:
+                if (i <= j): 
+                    flag = False
+                    break
+            if (flag):
+                new_cliques.append(i)
+        self._cliques = new_cliques
 
     def parseGraph(self, fileName):
         line_no = 1
@@ -119,6 +165,27 @@ class Graph:
         union_factor._cardinality_seq = union_factor_cardinality_seq
         return union_factor
 
+    def triangulate(self):
+        not_current_nodes = set()
+        total_added_edges = 0
+        G_tri = copy.deepcopy(self)
+        for count_node in range(G_tri._num_nodes):
+            node1 = G_tri._node_mindegree(not_current_nodes)
+            
+            current_clique = set([node1])
+            for neighbour in G_tri._nodes[node1].neighbours:
+                if(neighbour not in not_current_nodes):
+                    current_clique.add(neighbour)
+
+            total_added_edges = total_added_edges + G_tri._connect_clique(current_clique)
+            
+            not_current_nodes.add(node1)
+            G_tri._cliques.append(current_clique)
+            G_tri._maximal_cliques()
+        print "\nNumber of Edges Added : " ,total_added_edges
+        return G_tri
+
+
     def printParameters(self):
         print self._num_nodes
         print self._num_edges
@@ -135,5 +202,5 @@ class Graph:
 if __name__ == '__main__':
     G = Graph()
     G.parseGraph('samplegraph.txt')
-    G.parseFactor('potentials.txt')
-    G.printParameters()
+    # G.parseFactor('potentials.txt')
+    # G.printParameters()
