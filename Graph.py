@@ -128,19 +128,22 @@ class Graph:
         print node_list
         for i in range(len(node_list)):
             for j in range(i + 1, len(node_list)):
-                pair_node_list.append([node_list[i], node_list[j]])
-
-        print pair_node_list
+                pair = [node_list[i], node_list[j]]
+                pair_node_list.append(pair)
+                if _concatenate_sorted_list_of_integer_strings(pair) not in self._factors:
+                    intermediate_factor = self.Factor(pair)
+                    intermediate_factor._potentials = np.ones((self._nodes[pair[0]].cardinality, self._nodes[pair[1]].cardinality))
+                    self._factors[_concatenate_sorted_list_of_integer_strings(pair)] = intermediate_factor
 
         for node in node_list:
             if node in self._factors:
                 clique_node_factor = self.multiply_factor([node], clique_node_factor._node_seq)
 
         for pair in pair_node_list:
-            if _concatenate_sorted_list_of_integer_strings(pair) in self._factors:
-                clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
+            clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
 
-        self._factors[_concatenate_sorted_list_of_integer_strings(node_list)]=clique_node_factor
+        self._factors[_concatenate_sorted_list_of_integer_strings(node_list)] = clique_node_factor
+
         return clique_node_factor
         #for pair in pair_node_list:
         #    if _concatenate_sorted_list_of_integer_strings(pair) in self._factors and (pair[0] not in clique_node_factor._node_set or pair[1] not in clique_node_factor._node_set):
@@ -229,26 +232,36 @@ class Graph:
         print " Clique index : " + str(clique_index)
 
         MPA_tree = copy.deepcopy(self)
+        for k in range(len(MPA_tree._JTree._edgeList) - 1):
+            for i in range(len(MPA_tree._JTree._edgeList)):
+                if len(MPA_tree._JTree._edgeList[i]) == 1 and clique_index != i:
+                    dest_clique_index = MPA_tree._JTree._edgeList[i][0][0]
+                    print "To be eliminated : "
+                    print MPA_tree._JTree._nodeList[i]
+                    message_factor = MPA_tree._JTree._edgeList[i][0][2]
+                    print "message_factor._node_seq"
+                    print message_factor._node_seq
+                    print "MPA_tree._JTree._factorList[dest_clique_index]._node_seq"
+                    print MPA_tree._JTree._factorList[dest_clique_index]._node_seq
+                    print self._factors.keys()
+                    MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor(message_factor._node_seq, MPA_tree._JTree._factorList[dest_clique_index]._node_seq)
+                    # removing nodes and edges.
+                    MPA_tree._JTree._nodeList[i] = None
+                    MPA_tree._JTree._factorList[i] = None
+                    MPA_tree._JTree._edgeList[i] = []
+                    for j in range(len(MPA_tree._JTree._edgeList[dest_clique_index])):
+                        if MPA_tree._JTree._edgeList[dest_clique_index][j][0] == i:
+                            MPA_tree._JTree._edgeList[dest_clique_index].remove(MPA_tree._JTree._edgeList[dest_clique_index][j])
+                            break
+                    break
+        for m in MPA_tree._JTree._factorList:
+            if m is not None:
+                out_factor = m
+                if len(out_factor._node_seq) > len(node_list):
+                    result_factor = self.marginalize_factor(out_factor._node_seq, list(set(out_factor._node_seq) - set(node_list)))
 
-        for i in range(len(MPA_tree._JTree._edgeList)):
-            if len(MPA_tree._JTree._edgeList[i]) == 1 and clique_index != i:
-                dest_clique_index = MPA_tree._JTree._edgeList[i][0][0]
-                print MPA_tree._JTree._nodeList[i]
-                message_factor = MPA_tree._JTree._edgeList[i][0][2]
-                print "message_factor._node_seq"
-                print message_factor._node_seq
-                print "MPA_tree._JTree._factorList[dest_clique_index]._node_seq"
-                print MPA_tree._JTree._factorList[dest_clique_index]._node_seq
-                print self._factors.keys()
-                MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor(message_factor._node_seq, MPA_tree._JTree._factorList[dest_clique_index]._node_seq)
-                # removing nodes and edges.
-                MPA_tree._JTree._nodeList[i] = None
-                MPA_tree._JTree._edgeList[i] = []
-                for j in range(len(MPA_tree._JTree._edgeList[dest_clique_index])):
-                    if MPA_tree._JTree._edgeList[dest_clique_index][j][0] == i:
-                        MPA_tree._JTree._edgeList[dest_clique_index].remove(MPA_tree._JTree._edgeList[dest_clique_index][j])
-                break        
-        return MPA_tree
+        probability = result_factor._potentials / np.sum(result_factor._potentials)
+        return probability
 
     def parseGraph(self, fileName):
         line_no = 1
@@ -304,7 +317,6 @@ class Graph:
         union = list(self._factors[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
         union.sort(key=int)
         union_factor_key = _concatenate_sorted_list_of_integer_strings(union)
-        print union_factor_key
         union_factor_cardinality_seq = []
         union_indices = []
 
@@ -314,11 +326,27 @@ class Graph:
 
         union_factor_potentials = np.zeros(tuple(union_factor_cardinality_seq))
 
+        print "union_factor_potentials.shape..."
+        print union_factor_potentials.shape
         mask1 = _mask_node_list(union, self._factors[factor_key1]._node_seq)
         mask2 = _mask_node_list(union, self._factors[factor_key2]._node_seq)
+        print "Multiplying factors...."
+        print union
+        print mask1
+        print mask2
         for index in product(*union_indices):
-            union_factor_potentials[index] = (self._factors[factor_key1]._potentials[_masked_tuple(index, mask1)] *
-                                              self._factors[factor_key2]._potentials[_masked_tuple(index, mask2)])
+            try:
+                union_factor_potentials[index] = (self._factors[factor_key1]._potentials[_masked_tuple(index, mask1)] *
+                                                  self._factors[factor_key2]._potentials[_masked_tuple(index, mask2)])
+            except IndexError:
+                print "IndexError...."
+                print index
+                print factor_key1
+                print self._factors[factor_key1]._potentials.shape
+                print _masked_tuple(index, mask1)
+                print factor_key2
+                print self._factors[factor_key2]._potentials.shape
+                print _masked_tuple(index, mask2)
 
         union_factor = self.Factor(union)
         union_factor._potentials = union_factor_potentials
@@ -330,12 +358,24 @@ class Graph:
         factor_key = _concatenate_sorted_list_of_integer_strings(factor_node_list)
         factor_node_list.sort(key=int)
         elimination_variables.sort(key=int)
+        print "marginalize_factor...."
+        print factor_node_list
+        print elimination_variables
         remaining_variables = list(set(factor_node_list) - set(elimination_variables))
         output_factor = self.Factor(remaining_variables)
         sum_axes = []
         for i in elimination_variables:
             sum_axes.append(factor_node_list.index(i))
+        print "sum_axes"
+        print sum_axes
+        print "factor_key"
+        print factor_key
         output_factor._potentials = np.sum(self._factors[factor_key]._potentials, tuple(sum_axes))
+        print "self._factors[factor_key]._potentials"
+        print self._factors[factor_key]._potentials
+        print "output_factor._potentials.shape"
+        print output_factor._potentials.shape
+        self._factors[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
         return output_factor
 
     def triangulate(self):
