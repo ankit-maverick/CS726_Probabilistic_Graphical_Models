@@ -15,7 +15,6 @@ def _diff_list(a, b):
     b = set(b)
     return [aa for aa in a if aa not in b]
 
-
 def _mask_node_list(union_factor_list, factor_list):
     mask = []
     for i in union_factor_list:
@@ -24,7 +23,6 @@ def _mask_node_list(union_factor_list, factor_list):
         else:
             mask.append(False)
     return mask
-
 
 def _masked_tuple(union_factor_index, mask):
     factor_index = []
@@ -42,6 +40,7 @@ class Graph:
         self._nodes = {}
         self._factors = {}
         self._cliques = []
+        self._JTree = None
 
     class Node:
         def __init__(self, index, cardinality):
@@ -54,11 +53,23 @@ class Graph:
             self._node_seq = node_list
             self._node_set = set(node_list)
             self._cardinality_seq = []
-            self._cardinality_product = 1            
+            self._cardinality_product = 1
+            self._potentials = None
 
-    def _node_mindegree(self,not_current_nodes):
+    class JunctionTree:
+        def __init__(self):
+            self._Nodes = []
+            self._nodeList =[]
+            self._edgeList =[]
+
+    class JT_Node:
+        def __init__(self):
+            self._neighbours = []
+            self._clique = set([])
+
+    def _nodeMindegree(self,not_current_nodes):
         mindegree =float("inf")
-        node_mindegree = ""
+        nodeMindegree = ""
 
         for key in self._nodes.keys():
             if((key in not_current_nodes) == False):
@@ -71,22 +82,22 @@ class Graph:
                 
                 if(key_degree < mindegree):
                     mindegree = key_degree
-                    node_mindegree = key
-        return node_mindegree
+                    nodeMindegree = key
+        return nodeMindegree
 
-    def _connect_clique(self, clique):
+    def _connectClique(self, clique):
         added_edges = 0
         for i in clique:
             for j in clique:
                 if((i != j) and (j not in self._nodes[i].neighbours)):
-                    print "Edge added : ",i,"-",j
+                    print "-- Edge added : ",i,"-",j
                     self._num_edges = self._num_edges + 1
                     added_edges = added_edges + 1
                     self._nodes[i].neighbours.add(j)
                     self._nodes[j].neighbours.add(i)
         return added_edges
 
-    def _maximal_cliques(self):
+    def _maximalClique(self):
         new_cliques = []
         for i in self._cliques:
             temp_cliques = copy.deepcopy(self._cliques)
@@ -99,6 +110,79 @@ class Graph:
             if (flag):
                 new_cliques.append(i)
         self._cliques = new_cliques
+
+    def _maximalEdge(self, crossing_edges):
+        max_edge = (0,0,set([]))
+        for edge1 in crossing_edges:
+            if(edge1[1] > max_edge[1]):
+                max_edge = edge1;
+        return max_edge
+
+
+    def junctionTree(self):
+        # Generate Graph with Maximal Cliques as Nodes and edge weight between them as number of common Variables between them
+        clique_graph = []
+        clique_nodes = self._cliques
+        for i in clique_nodes:
+            connection_list =[]
+            for j in clique_nodes:
+                if (i != j):
+                    intersect = len(i.intersection(j))
+                    if(intersect > 0):
+                        connection_list.append((clique_nodes.index(j),intersect,j))
+            clique_graph.append(connection_list)
+
+        # Prim's Algorithm
+        n = len(clique_nodes)
+        V = [0]
+        E = []
+        print "\nNumber of Clique Nodes : ",n
+        print "Number of Clique Nodes : ",n-1,"\n"
+        for count_node in range(n):
+            E.append([])
+        for count_node in range(n-1):
+            crossing_edges =[]
+            for node1 in V:
+                for edge1 in clique_graph[node1] :
+                    if(edge1[0] not in V):
+
+                        crossing_edges.append(edge1)
+
+            max_edge = self._maximalEdge(crossing_edges)
+            V.append(max_edge[0])
+
+            E[node1].append((max_edge[0],max_edge[1]))
+            E[max_edge[0]].append((node1,max_edge[1]))
+
+        # Store JuntionTree in self._JTree
+        self._JTree = self.JunctionTree()
+        for node1 in clique_nodes:
+            jt_node = self.JT_Node()
+            jt_node._clique = node1
+            self._JTree._Nodes.append(jt_node)
+
+        for jt_node in self._JTree._Nodes:
+            jt_node._neighbours = []
+            
+            for e in E[clique_nodes.index(jt_node._clique)]:
+                jt_node._neighbours.append((self._JTree._Nodes[e[0]],e[1]))
+
+        self._JTree._edgeList = E
+        self._JTree._nodeList = clique_nodes
+
+        # Calculate & Print Largest Clique
+        largest_clique = set([])
+        for i in self._JTree._nodeList:
+            if (len(i) > len(largest_clique)):
+                largest_clique = i
+
+        print "Largest Clique : ",largest_clique, "\n"
+        
+        # Calculate Separatir Nodes
+        for e in self._JTree._edgeList:
+            for i in e:
+                print "Cliques : ", self._JTree._nodeList[self._JTree._edgeList.index(e)]," & ", self._JTree._nodeList[i[0]], "  |   Separation Variables : ", self._JTree._nodeList[self._JTree._edgeList.index(e)].intersection(self._JTree._nodeList[i[0]])
+
 
     def parseGraph(self, fileName):
         line_no = 1
@@ -173,18 +257,19 @@ class Graph:
         total_added_edges = 0
         G_tri = copy.deepcopy(self)
         for count_node in range(G_tri._num_nodes):
-            node1 = G_tri._node_mindegree(not_current_nodes)
+            node1 = G_tri._nodeMindegree(not_current_nodes)
             
             current_clique = set([node1])
             for neighbour in G_tri._nodes[node1].neighbours:
                 if(neighbour not in not_current_nodes):
                     current_clique.add(neighbour)
 
-            total_added_edges = total_added_edges + G_tri._connect_clique(current_clique)
+            print "MinDegree Node :", node1
+            total_added_edges = total_added_edges + G_tri._connectClique(current_clique)
             
             not_current_nodes.add(node1)
             G_tri._cliques.append(current_clique)
-            G_tri._maximal_cliques()
+            G_tri._maximalClique()
         print "\nNumber of Edges Added : " ,total_added_edges
         return G_tri
 
