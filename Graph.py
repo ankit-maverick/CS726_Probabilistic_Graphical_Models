@@ -218,7 +218,35 @@ class Graph:
             for i in e:
                 print "Cliques : ", self._JTree._nodeList[self._JTree._edgeList.index(e)]," & ", self._JTree._nodeList[i[0]], "  |   Separation Variables : ", self._JTree._nodeList[self._JTree._edgeList.index(e)].intersection(self._JTree._nodeList[i[0]])
 
+    def sum_query(self, node_list):
+        node_list = set(node_list)
+        for i in range(len(self._JTree._nodeList)):
+            if node_list <= self._JTree._nodeList[i]:
+                clique_index = i
+                break
+        print " Clique index : " + str(clique_index)
 
+        MPA_tree = copy.deepcopy(self)
+
+        for i in range(len(MPA_tree._JTree._edgeList)):
+            if len(MPA_tree._JTree._edgeList[i]) == 1 and clique_index != i:
+                dest_clique_index = MPA_tree._JTree._edgeList[i][0][0]
+                print MPA_tree._JTree._nodeList[i]
+                message_factor = MPA_tree._JTree._edgeList[i][0][2]
+                print "message_factor._node_seq"
+                print message_factor._node_seq
+                print "MPA_tree._JTree._factorList[dest_clique_index]._node_seq"
+                print MPA_tree._JTree._factorList[dest_clique_index]._node_seq
+                print self._factors.keys()
+                MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor(message_factor._node_seq, MPA_tree._JTree._factorList[dest_clique_index]._node_seq)
+                # removing nodes and edges.
+                MPA_tree._JTree._nodeList[i] = None
+                MPA_tree._JTree._edgeList[i] = []
+                for j in range(len(MPA_tree._JTree._edgeList[dest_clique_index])):
+                    if MPA_tree._JTree._edgeList[dest_clique_index][j][0] == i:
+                        MPA_tree._JTree._edgeList[dest_clique_index].remove(MPA_tree._JTree._edgeList[dest_clique_index][j])
+                break        
+        return MPA_tree
 
     def parseGraph(self, fileName):
         line_no = 1
