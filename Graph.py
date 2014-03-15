@@ -140,6 +140,7 @@ class Graph:
             if _concatenate_sorted_list_of_integer_strings(pair) in self._factors:
                 clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
 
+        self._factors[_concatenate_sorted_list_of_integer_strings(node_list)]=clique_node_factor
         return clique_node_factor
         #for pair in pair_node_list:
         #    if _concatenate_sorted_list_of_integer_strings(pair) in self._factors and (pair[0] not in clique_node_factor._node_set or pair[1] not in clique_node_factor._node_set):
@@ -166,6 +167,12 @@ class Graph:
         E = []
         print "\nNumber of Clique Nodes : ",n
         print "Number of Clique Nodes : ",n-1,"\n"
+
+        self._JTree = self.JunctionTree()
+        for node in clique_nodes:
+            node_list = list(node)
+            self._JTree._factorList.append(self._multiply_factors_for_clique_node(node_list))
+
         for count_node in range(n):
             E.append([])
         for count_node in range(n-1):
@@ -174,17 +181,16 @@ class Graph:
                 for edge1 in clique_graph[node1] :
 
                     if(edge1[0] not in V):
-
+                        node2 = node1
                         crossing_edges.append(edge1)
 
             max_edge = self._maximalEdge(crossing_edges)
             V.append(max_edge[0])
-
-            E[node1].append((max_edge[0], max_edge[1], marginalize_factor(list(clique_nodes[node1]), list(clique_nodes[node1] - (clique_nodes[node1].intersection(clique_nodes[max_edge[0]]))))
-            E[max_edge[0]].append((node1, max_edge[1], marginalize_factor(list(clique_nodes[max_edge[0]]), list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node1]))))
+            E[node2].append((max_edge[0], max_edge[1], self.marginalize_factor(list(clique_nodes[node2]), list(clique_nodes[node2] - (clique_nodes[node2].intersection(clique_nodes[max_edge[0]]))))))
+            E[max_edge[0]].append((node2, max_edge[1], self.marginalize_factor(list(clique_nodes[max_edge[0]]), list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node2]))))))
 
         # Store JuntionTree in self._JTree
-        self._JTree = self.JunctionTree()
+        
         for node1 in clique_nodes:
             jt_node = self.JT_Node()
             jt_node._clique = node1
@@ -198,11 +204,6 @@ class Graph:
 
         self._JTree._edgeList = E
         self._JTree._nodeList = clique_nodes
-
-        for node in self._JTree._nodeList:
-            node_list = list(node)
-
-            self._JTree._factorList.append(self._multiply_factors_for_clique_node(node_list))
 
         # Calculate & Print Largest Clique
         largest_clique = set([])
@@ -298,7 +299,7 @@ class Graph:
     def marginalize_factor(self, factor_node_list, elimination_variables):
         factor_key = _concatenate_sorted_list_of_integer_strings(factor_node_list)
         factor_node_list.sort(key=int)
-        elimination_variable.sort(key=int)
+        elimination_variables.sort(key=int)
         remaining_variables = list(set(factor_node_list) - set(elimination_variables))
         output_factor = self.Factor(remaining_variables)
         sum_axes = []
