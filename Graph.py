@@ -7,8 +7,8 @@ def _concatenate_sorted_list_of_integer_strings(l):
     l.sort(key=int)
     string = ''
     for i in l:
-        string = string + i
-    return string
+        string = string + i + "_"
+    return string[:-1]
 
 
 def _diff_list(a, b):
@@ -140,11 +140,13 @@ class Graph:
                     self._factors[key]._potentials[index] = float(line[-1])
 
     def multiply_factor(self, factor_key1, factor_key2):
-        factor_key1 = _concatenate_sorted_list_of_integer_strings(list(factor_key1))
-        factor_key2 = _concatenate_sorted_list_of_integer_strings(list(factor_key2))
+        factor_key1 = _concatenate_sorted_list_of_integer_strings(list(factor_key1.split('_')))
+        factor_key2 = _concatenate_sorted_list_of_integer_strings(list(factor_key2.split('_')))
 
         union = list(self._factors[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
         union.sort(key=int)
+        union_factor_key = _concatenate_sorted_list_of_integer_strings(union)
+        print union_factor_key
         union_factor_cardinality_seq = []
         union_indices = []
 
@@ -163,7 +165,8 @@ class Graph:
         union_factor = self.Factor(union)
         union_factor._potentials = union_factor_potentials
         union_factor._cardinality_seq = union_factor_cardinality_seq
-        return union_factor
+        self._factors[union_factor_key] = union_factor
+        #return union_factor
 
     def triangulate(self):
         not_current_nodes = set()
@@ -190,17 +193,19 @@ class Graph:
         print self._num_nodes
         print self._num_edges
         print self._nodes['1'].neighbours
-        print self._factors['01']._node_seq
-        print self._factors['01']._potentials
-        print self._factors['12']._node_seq
-        print self._factors['12']._potentials
-        factor = self.multiply_factor('01', '12')
-        print factor._node_seq
-        print factor._potentials
+        print self._factors['0_1']._node_seq
+        print self._factors['0_1']._potentials
+        print self._factors['1_2']._node_seq
+        print self._factors['1_2']._potentials
+        print "Multiplying factors..."
+        self.multiply_factor('0_1', '1_2')
+        print self._factors.keys()
+        print self._factors['0_1_2']._node_seq
+        print self._factors['0_1_2']._potentials
 
 
 if __name__ == '__main__':
     G = Graph()
-    G.parseGraph('samplegraph.txt')
-    # G.parseFactor('potentials.txt')
-    # G.printParameters()
+    G.parseGraph('TestCases/graph_1')
+    G.parseFactor('TestCases/potentials_1')
+    G.printParameters()
