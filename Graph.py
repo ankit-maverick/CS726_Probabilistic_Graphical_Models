@@ -115,9 +115,9 @@ class Graph:
         self._cliques = new_cliques
 
     def _maximalEdge(self, crossing_edges):
-        max_edge = (0,0,set([]))
+        max_edge = (0,(0,0,set([])))
         for edge1 in crossing_edges:
-            if(edge1[1] > max_edge[1]):
+            if(edge1[1][1] > max_edge[1][1]):
                 max_edge = edge1;
         return max_edge
 
@@ -181,10 +181,12 @@ class Graph:
                 for edge1 in clique_graph[node1] :
 
                     if(edge1[0] not in V):
-                        node2 = node1
-                        crossing_edges.append(edge1)
+                        # node2 = node1
+                        crossing_edges.append((node1,edge1))
 
-            max_edge = self._maximalEdge(crossing_edges)
+            (node2,max_edge) = self._maximalEdge(crossing_edges)
+            print "max :" ,max_edge 
+
             V.append(max_edge[0])
             E[node2].append((max_edge[0], max_edge[1], self.marginalize_factor(list(clique_nodes[node2]), list(clique_nodes[node2] - (clique_nodes[node2].intersection(clique_nodes[max_edge[0]]))))))
             E[max_edge[0]].append((node2, max_edge[1], self.marginalize_factor(list(clique_nodes[max_edge[0]]), list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node2]))))))
