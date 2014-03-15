@@ -22,6 +22,7 @@ def _mask_node_list(union_factor_list, factor_list):
             mask.append(True)
         else:
             mask.append(False)
+
     return mask
 
 def _masked_tuple(union_factor_index, mask):
@@ -59,15 +60,17 @@ class Graph:
     class JunctionTree:
         def __init__(self):
             self._Nodes = []
-            self._nodeList =[]
-            self._edgeList =[]
+            self._nodeList = []
+            self._factorList = []
+            self._edgeList = []
+            self._messageList = []
 
     class JT_Node:
         def __init__(self):
             self._neighbours = []
             self._clique = set([])
 
-    def _nodeMindegree(self,not_current_nodes):
+    def _nodeMindegree(self, not_current_nodes):
         mindegree =float("inf")
         nodeMindegree = ""
 
@@ -118,9 +121,34 @@ class Graph:
                 max_edge = edge1;
         return max_edge
 
+    def _multiply_factors_for_clique_node(self, node_list):
+        clique_node_factor = self.Factor([])
+        pair_node_list = []
+        print "Entering _multiply_factors_for_clique_node...."
+        print node_list
+        for i in range(len(node_list)):
+            for j in range(i + 1, len(node_list)):
+                pair_node_list.append([node_list[i], node_list[j]])
+
+        print pair_node_list
+
+        for node in node_list:
+            if node in self._factors:
+                clique_node_factor = self.multiply_factor([node], clique_node_factor._node_seq)
+
+        for pair in pair_node_list:
+            if _concatenate_sorted_list_of_integer_strings(pair) in self._factors:
+                clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
+
+        return clique_node_factor
+        #for pair in pair_node_list:
+        #    if _concatenate_sorted_list_of_integer_strings(pair) in self._factors and (pair[0] not in clique_node_factor._node_set or pair[1] not in clique_node_factor._node_set):
+        #        clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
+
 
     def junctionTree(self):
-        # Generate Graph with Maximal Cliques as Nodes and edge weight between them as number of common Variables between them
+        # Generate Graph with Maximal Cliques as Nodes and edge weight
+        # between them as number of common Variables between them
         clique_graph = []
         clique_nodes = self._cliques
         for i in clique_nodes:
@@ -144,6 +172,7 @@ class Graph:
             crossing_edges =[]
             for node1 in V:
                 for edge1 in clique_graph[node1] :
+
                     if(edge1[0] not in V):
 
                         crossing_edges.append(edge1)
@@ -151,8 +180,8 @@ class Graph:
             max_edge = self._maximalEdge(crossing_edges)
             V.append(max_edge[0])
 
-            E[node1].append((max_edge[0],max_edge[1]))
-            E[max_edge[0]].append((node1,max_edge[1]))
+            E[node1].append((max_edge[0], max_edge[1], marginalize_factor(list(clique_nodes[node1]), list(clique_nodes[node1] - (clique_nodes[node1].intersection(clique_nodes[max_edge[0]]))))
+            E[max_edge[0]].append((node1, max_edge[1], marginalize_factor(list(clique_nodes[max_edge[0]]), list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node1]))))
 
         # Store JuntionTree in self._JTree
         self._JTree = self.JunctionTree()
@@ -170,6 +199,11 @@ class Graph:
         self._JTree._edgeList = E
         self._JTree._nodeList = clique_nodes
 
+        for node in self._JTree._nodeList:
+            node_list = list(node)
+
+            self._JTree._factorList.append(self._multiply_factors_for_clique_node(node_list))
+
         # Calculate & Print Largest Clique
         largest_clique = set([])
         for i in self._JTree._nodeList:
@@ -182,6 +216,7 @@ class Graph:
         for e in self._JTree._edgeList:
             for i in e:
                 print "Cliques : ", self._JTree._nodeList[self._JTree._edgeList.index(e)]," & ", self._JTree._nodeList[i[0]], "  |   Separation Variables : ", self._JTree._nodeList[self._JTree._edgeList.index(e)].intersection(self._JTree._nodeList[i[0]])
+
 
 
     def parseGraph(self, fileName):
@@ -223,9 +258,17 @@ class Graph:
                     index = tuple(np.asarray(line[:-1]).astype(int))
                     self._factors[key]._potentials[index] = float(line[-1])
 
-    def multiply_factor(self, factor_key1, factor_key2):
-        factor_key1 = _concatenate_sorted_list_of_integer_strings(list(factor_key1.split('_')))
-        factor_key2 = _concatenate_sorted_list_of_integer_strings(list(factor_key2.split('_')))
+    def multiply_factor(self, factor_node_list1, factor_node_list2):
+        if factor_node_list1 == []:
+            union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor_node_list2)]
+            return union_factor
+
+        if factor_node_list2 == []:
+            union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor_node_list1)]
+            return union_factor
+
+        factor_key1 = _concatenate_sorted_list_of_integer_strings(factor_node_list1)
+        factor_key2 = _concatenate_sorted_list_of_integer_strings(factor_node_list2)
 
         union = list(self._factors[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
         union.sort(key=int)
@@ -250,7 +293,19 @@ class Graph:
         union_factor._potentials = union_factor_potentials
         union_factor._cardinality_seq = union_factor_cardinality_seq
         self._factors[union_factor_key] = union_factor
-        #return union_factor
+        return union_factor
+
+    def marginalize_factor(self, factor_node_list, elimination_variables):
+        factor_key = _concatenate_sorted_list_of_integer_strings(factor_node_list)
+        factor_node_list.sort(key=int)
+        elimination_variable.sort(key=int)
+        remaining_variables = list(set(factor_node_list) - set(elimination_variables))
+        output_factor = self.Factor(remaining_variables)
+        sum_axes = []
+        for i in elimination_variables:
+            sum_axes.append(factor_node_list.index(i))
+        output_factor._potentials = np.sum(self._factors[factor_key]._potentials, tuple(sum_axes))
+        return output_factor
 
     def triangulate(self):
         not_current_nodes = set()
@@ -283,10 +338,19 @@ class Graph:
         print self._factors['1_2']._node_seq
         print self._factors['1_2']._potentials
         print "Multiplying factors..."
-        self.multiply_factor('0_1', '1_2')
-        print self._factors.keys()
-        print self._factors['0_1_2']._node_seq
-        print self._factors['0_1_2']._potentials
+        # self.multiply_factor(['2','7'], ['6','7'])
+        # #print self._factors.keys()
+        # print self._factors['2_6_7']._node_seq
+        # print self._factors['2_6_7']._potentials
+        # print "Multiplying factors..."
+        # self.multiply_factor(['6','7'], ['6','2'])
+        # print self._factors['2_6_7']._node_seq
+        # print self._factors['2_6_7']._potentials
+        # print "Multiplying factors..."
+        # self.multiply_factor(['2','6'], ['7','2'])
+        # print self._factors.keys()
+        # print self._factors['2_6_7']._node_seq
+        # print self._factors['2_6_7']._potentials
 
 
 if __name__ == '__main__':
