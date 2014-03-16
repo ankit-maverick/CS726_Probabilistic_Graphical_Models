@@ -64,6 +64,7 @@ class Graph:
             self._factorList = []
             self._edgeList = []
             self._messageList = []
+            self._messages ={}
 
     class JT_Node:
         def __init__(self):
@@ -124,6 +125,7 @@ class Graph:
     def _multiply_factors_for_clique_node(self, node_list):
         clique_node_factor = self.Factor([])
         pair_node_list = []
+        node_list.sort(key=int)
         print "Entering _multiply_factors_for_clique_node...."
         print node_list
         for i in range(len(node_list)):
@@ -135,14 +137,24 @@ class Graph:
                     intermediate_factor._potentials = np.ones((self._nodes[pair[0]].cardinality, self._nodes[pair[1]].cardinality))
                     self._factors[_concatenate_sorted_list_of_integer_strings(pair)] = intermediate_factor
 
+        for pair in pair_node_list:
+            #clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
+            clique_node_factor = self.multiply_factor_modified(self._factors[_concatenate_sorted_list_of_integer_strings(pair)], clique_node_factor)
+
+
         for node in node_list:
             if node in self._factors:
-                clique_node_factor = self.multiply_factor([node], clique_node_factor._node_seq)
+                print clique_node_factor._node_seq
+                print clique_node_factor._potentials
 
-        for pair in pair_node_list:
-            clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
+                #clique_node_factor = self.multiply_factor([node], clique_node_factor._node_seq)
+                clique_node_factor = self.multiply_factor_modified(self._factors[node], clique_node_factor)
+                print "Multiplied a node potential....."
+                print clique_node_factor._node_seq
+                print self._factors[node]._potentials                
+                print clique_node_factor._potentials
 
-        self._factors[_concatenate_sorted_list_of_integer_strings(node_list)] = clique_node_factor
+        #self._factors[_concatenate_sorted_list_of_integer_strings(node_list)] = clique_node_factor
 
         return clique_node_factor
         #for pair in pair_node_list:
@@ -191,8 +203,8 @@ class Graph:
             print "max :" ,max_edge 
 
             V.append(max_edge[0])
-            E[node2].append((max_edge[0], max_edge[1], self.marginalize_factor(list(clique_nodes[node2]), list(clique_nodes[node2] - (clique_nodes[node2].intersection(clique_nodes[max_edge[0]]))))))
-            E[max_edge[0]].append((node2, max_edge[1], self.marginalize_factor(list(clique_nodes[max_edge[0]]), list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node2]))))))
+            E[node2].append((max_edge[0], max_edge[1], self.marginalize_factor(self._JTree._factorList[node2], list(clique_nodes[node2] - (clique_nodes[node2].intersection(clique_nodes[max_edge[0]]))), flag='msg')))
+            E[max_edge[0]].append((node2, max_edge[1], self.marginalize_factor(self._JTree._factorList[max_edge[0]], list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node2]))), flag='msg')))
 
         # Store JuntionTree in self._JTree
         
@@ -244,7 +256,8 @@ class Graph:
                     print "MPA_tree._JTree._factorList[dest_clique_index]._node_seq"
                     print MPA_tree._JTree._factorList[dest_clique_index]._node_seq
                     print self._factors.keys()
-                    MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor(message_factor._node_seq, MPA_tree._JTree._factorList[dest_clique_index]._node_seq)
+                    #MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor(message_factor._node_seq, MPA_tree._JTree._factorList[dest_clique_index]._node_seq, flag='m')
+                    MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor_modified(message_factor, MPA_tree._JTree._factorList[dest_clique_index])
                     # removing nodes and edges.
                     MPA_tree._JTree._nodeList[i] = None
                     MPA_tree._JTree._factorList[i] = None
@@ -258,7 +271,9 @@ class Graph:
             if m is not None:
                 out_factor = m
                 if len(out_factor._node_seq) > len(node_list):
-                    result_factor = self.marginalize_factor(out_factor._node_seq, list(set(out_factor._node_seq) - set(node_list)))
+                    result_factor = self.marginalize_factor(out_factor, list(set(out_factor._node_seq) - set(node_list)), flag='notmsg')
+                else:
+                    result_factor = out_factor
 
         probability = result_factor._potentials / np.sum(result_factor._potentials)
         return probability
@@ -302,7 +317,41 @@ class Graph:
                     index = tuple(np.asarray(line[:-1]).astype(int))
                     self._factors[key]._potentials[index] = float(line[-1])
 
-    def multiply_factor(self, factor_node_list1, factor_node_list2):
+    def multiply_factor_modified(self, factor1, factor2):
+        if factor1._node_seq == []:
+            union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor2._node_seq)]
+            return union_factor
+
+        if factor2._node_seq == []:
+            union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor1._node_seq)]
+            return union_factor
+
+        union = list(factor1._node_set.union(factor2._node_set))
+        union.sort(key=int)
+        union_factor_key = _concatenate_sorted_list_of_integer_strings(union)
+        union_factor_cardinality_seq = []
+        union_indices = []
+
+        for i in union:
+            union_indices.append(range(self._nodes[i].cardinality))
+            union_factor_cardinality_seq.append(self._nodes[i].cardinality)
+
+        union_factor_potentials = np.zeros(tuple(union_factor_cardinality_seq))
+        mask1 = _mask_node_list(union, factor1._node_seq)
+        mask2 = _mask_node_list(union, factor2._node_seq)
+
+        for index in product(*union_indices):
+            union_factor_potentials[index] = (factor1._potentials[_masked_tuple(index, mask1)] *
+                                                  factor2._potentials[_masked_tuple(index, mask2)])
+
+
+        union_factor = self.Factor(union)
+        union_factor._potentials = union_factor_potentials
+        union_factor._cardinality_seq = union_factor_cardinality_seq
+        #self._factors[union_factor_key] = union_factor
+        return union_factor
+
+    def multiply_factor(self, factor_node_list1, factor_node_list2, flag='n'):
         if factor_node_list1 == []:
             union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor_node_list2)]
             return union_factor
@@ -314,7 +363,10 @@ class Graph:
         factor_key1 = _concatenate_sorted_list_of_integer_strings(factor_node_list1)
         factor_key2 = _concatenate_sorted_list_of_integer_strings(factor_node_list2)
 
-        union = list(self._factors[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
+        if flag == 'm':
+            union = list(self._JTree._messages[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
+        else:
+            union = list(self._factors[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
         union.sort(key=int)
         union_factor_key = _concatenate_sorted_list_of_integer_strings(union)
         union_factor_cardinality_seq = []
@@ -326,56 +378,46 @@ class Graph:
 
         union_factor_potentials = np.zeros(tuple(union_factor_cardinality_seq))
 
-        print "union_factor_potentials.shape..."
-        print union_factor_potentials.shape
+        # print "union_factor_potentials.shape..."
+        # print union_factor_potentials.shape
         mask1 = _mask_node_list(union, self._factors[factor_key1]._node_seq)
         mask2 = _mask_node_list(union, self._factors[factor_key2]._node_seq)
-        print "Multiplying factors...."
-        print union
-        print mask1
-        print mask2
+        # print "Multiplying factors...."
+        # print union
+        # print mask1
+        # print mask2
         for index in product(*union_indices):
-            try:
+            if flag=='m':
+                union_factor_potentials[index] = (self._JTree._messages[factor_key1]._potentials[_masked_tuple(index, mask1)] *
+                                                  self._factors[factor_key2]._potentials[_masked_tuple(index, mask2)])
+            else:
                 union_factor_potentials[index] = (self._factors[factor_key1]._potentials[_masked_tuple(index, mask1)] *
                                                   self._factors[factor_key2]._potentials[_masked_tuple(index, mask2)])
-            except IndexError:
-                print "IndexError...."
-                print index
-                print factor_key1
-                print self._factors[factor_key1]._potentials.shape
-                print _masked_tuple(index, mask1)
-                print factor_key2
-                print self._factors[factor_key2]._potentials.shape
-                print _masked_tuple(index, mask2)
+
 
         union_factor = self.Factor(union)
         union_factor._potentials = union_factor_potentials
         union_factor._cardinality_seq = union_factor_cardinality_seq
-        self._factors[union_factor_key] = union_factor
+        #self._factors[union_factor_key] = union_factor
         return union_factor
 
-    def marginalize_factor(self, factor_node_list, elimination_variables):
+    def marginalize_factor(self, original_factor, elimination_variables, flag='msg'):
+        factor_node_list = original_factor._node_seq
         factor_key = _concatenate_sorted_list_of_integer_strings(factor_node_list)
         factor_node_list.sort(key=int)
         elimination_variables.sort(key=int)
-        print "marginalize_factor...."
-        print factor_node_list
-        print elimination_variables
+
         remaining_variables = list(set(factor_node_list) - set(elimination_variables))
         output_factor = self.Factor(remaining_variables)
         sum_axes = []
         for i in elimination_variables:
             sum_axes.append(factor_node_list.index(i))
-        print "sum_axes"
-        print sum_axes
-        print "factor_key"
-        print factor_key
-        output_factor._potentials = np.sum(self._factors[factor_key]._potentials, tuple(sum_axes))
-        print "self._factors[factor_key]._potentials"
-        print self._factors[factor_key]._potentials
-        print "output_factor._potentials.shape"
-        print output_factor._potentials.shape
-        self._factors[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
+
+        output_factor._potentials = np.sum(original_factor._potentials, tuple(sum_axes))
+
+        #self._factors[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
+        if flag == 'msg':
+            self._JTree._messages[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
         return output_factor
 
     def triangulate(self):
@@ -401,27 +443,11 @@ class Graph:
 
 
     def printParameters(self):
-        print self._num_nodes
-        print self._num_edges
-        print self._nodes['1'].neighbours
-        print self._factors['0_1']._node_seq
-        print self._factors['0_1']._potentials
-        print self._factors['1_2']._node_seq
-        print self._factors['1_2']._potentials
-        print "Multiplying factors..."
-        # self.multiply_factor(['2','7'], ['6','7'])
-        # #print self._factors.keys()
-        # print self._factors['2_6_7']._node_seq
-        # print self._factors['2_6_7']._potentials
-        # print "Multiplying factors..."
-        # self.multiply_factor(['6','7'], ['6','2'])
-        # print self._factors['2_6_7']._node_seq
-        # print self._factors['2_6_7']._potentials
-        # print "Multiplying factors..."
-        # self.multiply_factor(['2','6'], ['7','2'])
-        # print self._factors.keys()
-        # print self._factors['2_6_7']._node_seq
-        # print self._factors['2_6_7']._potentials
+        # print self._num_nodes
+        # print self._num_edges
+        # print self._nodes['1'].neighbours
+
+        pass
 
 
 if __name__ == '__main__':
