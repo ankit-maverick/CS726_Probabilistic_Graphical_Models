@@ -68,6 +68,8 @@ class Graph:
             # self._messages ={}
             self._msg = {}
             self._edgeMap = []
+            
+
 
     class JT_Node:
         def __init__(self):
@@ -236,8 +238,9 @@ class Graph:
         print "Eo : ", Eout
         print "Jtree edge number :", Jtree_edge_number
 
-        # Message Creation
+        # Message Creation Sum_query
         Ein_persistent =  copy.deepcopy(Ein)
+        Eout_persistent =  copy.deepcopy(Eout)
         self._JTree._edgeMap = Ein_persistent
 
         for count in range(2*Jtree_edge_number):
@@ -278,6 +281,47 @@ class Graph:
             print "Ei :",Ein
             print "Eo :",Eout, "\n"
 
+        # Message Creation MAP_Query
+        Ein = copy.deepcopy(Ein_persistent)
+        Eout = copy.deepcopy(Eout_persistent)
+        Eup = []
+        Edown = []
+        for i in range(len(clique_nodes)):
+            Eup.append(None)
+            Edown.append([])
+        for i in range(len(Ein)):
+            if len(Ein[i]) ==1 :
+                Root = i
+                break
+
+        print "Root :", Root
+        print "\nEup :",Eup
+        print "Edown :",Edown, "\n"
+        node1 = int(Root)
+        V = [Root]
+
+        while (len(V) < len(clique_nodes) ):
+            flag = True
+            # print Eout[node1], node1, V
+            for j in Eout[node1]:
+                if(j not in V):
+                    V.append(j)
+                    to = j
+                    frm = node1
+                    node1 = to
+                    # print frm ,to ,j
+                    Eup[to] = frm
+                    Edown[frm].append(to)
+                    flag = False
+                    break
+            if flag:
+                node1 = Eup[node1]
+                # print Eup, node1
+        print "*Tree Built*\n"
+        print "Eup : ", Eup
+        print "Edown : ", Edown
+
+        
         # Store JuntionTree in self._JTree
         for node1 in clique_nodes:
             jt_node = self.JT_Node()
@@ -321,6 +365,9 @@ class Graph:
                 msg_factor = self.multiply_factor_modified(msg_factor, self._JTree._msg[key])
         output_factor = self.marginalize_factor(msg_factor, list(set(msg_factor._node_seq) - set(node_list)))
         return output_factor._potentials / np.sum(output_factor._potentials)        
+
+    def MAP_config(self):
+        pass
 
     def parseGraph(self, fileName):
         line_no = 1
