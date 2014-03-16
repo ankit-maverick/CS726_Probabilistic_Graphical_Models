@@ -56,6 +56,7 @@ class Graph:
             self._cardinality_seq = []
             self._cardinality_product = 1
             self._potentials = None
+            self._flag = True
 
     class JunctionTree:
         def __init__(self):
@@ -63,8 +64,10 @@ class Graph:
             self._nodeList = []
             self._factorList = []
             self._edgeList = []
-            self._messageList = []
-            self._messages ={}
+            # self._messageList = []
+            # self._messages ={}
+            self._msg = {}
+            self._edgeMap = []
 
     class JT_Node:
         def __init__(self):
@@ -137,36 +140,47 @@ class Graph:
                     intermediate_factor._potentials = np.ones((self._nodes[pair[0]].cardinality, self._nodes[pair[1]].cardinality))
                     self._factors[_concatenate_sorted_list_of_integer_strings(pair)] = intermediate_factor
 
+        for i in range(len(node_list)):
+            if node_list[i] not in self._factors:
+                self._factors[node_list[i]] = self.Factor([node_list[i]])
+                self._factors[node_list[i]]._potentials = np.ones(self._nodes[node_list[i]].cardinality)
+
         for pair in pair_node_list:
             #clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
-            clique_node_factor = self.multiply_factor_modified(self._factors[_concatenate_sorted_list_of_integer_strings(pair)], clique_node_factor)
-
+            if self._factors[_concatenate_sorted_list_of_integer_strings(pair)]._flag:
+                print "Pair : "  ,pair
+                clique_node_factor = self.multiply_factor_modified(self._factors[_concatenate_sorted_list_of_integer_strings(pair)], clique_node_factor)
+                self._factors[_concatenate_sorted_list_of_integer_strings(pair)]._flag = False
+            else:
+                temp_factor = self.Factor(pair)
+                temp_factor._potentials = np.ones((self._nodes[pair[0]].cardinality, self._nodes[pair[1]].cardinality))
+                clique_node_factor = self.multiply_factor_modified(clique_node_factor, temp_factor)
 
         for node in node_list:
-            if node in self._factors:
-                print clique_node_factor._node_seq
-                print clique_node_factor._potentials
-
+            if self._factors[node]._flag:
+                # print clique_node_factor._node_seq
+                # print clique_node_factor._potentials
+                print  "Node : "  ,node
                 #clique_node_factor = self.multiply_factor([node], clique_node_factor._node_seq)
                 clique_node_factor = self.multiply_factor_modified(self._factors[node], clique_node_factor)
-                print "Multiplied a node potential....."
-                print clique_node_factor._node_seq
-                print self._factors[node]._potentials                
-                print clique_node_factor._potentials
-
+                self._factors[node]._flag = False
+                # print "Multiplied a node potential....."
+                # print clique_node_factor._node_seq
+                # print self._factors[node]._potentials                
+                # print clique_node_factor._potentials
+            else:
+                temp_factor = self.Factor([node])
+                temp_factor._potentials = np.ones(self._nodes[node].cardinality)
+                clique_node_factor = self.multiply_factor_modified(temp_factor, clique_node_factor)
         #self._factors[_concatenate_sorted_list_of_integer_strings(node_list)] = clique_node_factor
-
         return clique_node_factor
-        #for pair in pair_node_list:
-        #    if _concatenate_sorted_list_of_integer_strings(pair) in self._factors and (pair[0] not in clique_node_factor._node_set or pair[1] not in clique_node_factor._node_set):
-        #        clique_node_factor = self.multiply_factor(pair, clique_node_factor._node_seq)
-
 
     def junctionTree(self):
         # Generate Graph with Maximal Cliques as Nodes and edge weight
         # between them as number of common Variables between them
         clique_graph = []
         clique_nodes = self._cliques
+
         for i in clique_nodes:
             connection_list =[]
             for j in clique_nodes:
@@ -176,10 +190,12 @@ class Graph:
                         connection_list.append((clique_nodes.index(j),intersect,j))
             clique_graph.append(connection_list)
 
-        # Prim's Algorithm
+        # Prim's Algorithm for Junction Tree
         n = len(clique_nodes)
         V = [0]
         E = []
+        Ein = []
+        Eout = []
         print "\nNumber of Clique Nodes : ",n
         print "Number of Clique Nodes : ",n-1,"\n"
 
@@ -190,6 +206,10 @@ class Graph:
 
         for count_node in range(n):
             E.append([])
+            Ein.append([])
+            Eout.append([])
+
+        Jtree_edge_number = 0
         for count_node in range(n-1):
             crossing_edges =[]
             for node1 in V:
@@ -200,14 +220,65 @@ class Graph:
                         crossing_edges.append((node1,edge1))
 
             (node2,max_edge) = self._maximalEdge(crossing_edges)
-            print "max :" ,max_edge 
+            # print "max :" ,max_edge 
 
             V.append(max_edge[0])
-            E[node2].append((max_edge[0], max_edge[1], self.marginalize_factor(self._JTree._factorList[node2], list(clique_nodes[node2] - (clique_nodes[node2].intersection(clique_nodes[max_edge[0]]))), flag='msg')))
-            E[max_edge[0]].append((node2, max_edge[1], self.marginalize_factor(self._JTree._factorList[max_edge[0]], list(clique_nodes[max_edge[0]] - (clique_nodes[max_edge[0]].intersection(clique_nodes[node2]))), flag='msg')))
+            E[node2].append((max_edge[0], max_edge[1]))
+            E[max_edge[0]].append((node2, max_edge[1]))
+
+            Ein[node2].append(max_edge[0])
+            Eout[node2].append(max_edge[0])
+            Ein[max_edge[0]].append(node2)
+            Eout[max_edge[0]].append(node2)
+            Jtree_edge_number = Jtree_edge_number + 1
+
+        print "\nEi : ", Ein
+        print "Eo : ", Eout
+        print "Jtree edge number :", Jtree_edge_number
+
+        # Message Creation
+        Ein_persistent =  copy.deepcopy(Ein)
+        self._JTree._edgeMap = Ein_persistent
+
+        for count in range(2*Jtree_edge_number):
+            for i in range(len(Ein)):
+                if (len(Ein[i]) == 1 and Ein[i][0] in Eout[i]):
+                    to = Ein[i][0]
+                    frm = i
+                    print "** Node : ",i,"| in :", Ein[i]," | out :" ,Eout[i], " | frm -> to :", frm, "->",to
+                    msg_factor = self._JTree._factorList[frm]
+                    print "Ein_persistent[frm] :", Ein_persistent[frm]
+                    for k in range(len(Ein_persistent[frm])):
+                        if Ein_persistent[frm][k] != to:
+                            print Ein_persistent[frm][k]," => ", frm,"->", to
+                            msg_factor = self.multiply_factor_modified(msg_factor, self._JTree._msg[str(Ein_persistent[frm][k])+"_"+str(frm)])
+                    self._JTree._msg[str(frm)+"_"+str(to)] = self.marginalize_factor(msg_factor, list(set(self._JTree._factorList[frm]._node_seq) - set(self._JTree._factorList[frm]._node_seq).intersection(set(self._JTree._factorList[to]._node_seq))))
+                    Ein[to].remove(frm)
+                    Eout[frm].remove(to)
+                    break
+                elif (len(Ein[i]) == 0 and len(Eout[i]) != 0):   
+                    to = Eout[i][0]
+                    frm = i
+                    print "** Node : ",i,"| in :", Ein[i]," | out :" ,Eout[i], " | frm -> to : ", frm, "->",to
+                    msg_factor = self._JTree._factorList[frm]
+                    print "Ein_persistent[frm] :", Ein_persistent[frm]
+                    for k in range(len(Ein_persistent[frm])):
+                        if Ein_persistent[frm][k] != to:
+                            print Ein_persistent[frm][k]," => ", frm,"->", to
+                            msg_factor = self.multiply_factor_modified(msg_factor, self._JTree._msg[str(Ein_persistent[frm][k])+"_"+str(frm)])
+                    self._JTree._msg[str(frm)+"_"+str(to)] = self.marginalize_factor(msg_factor, list(set(self._JTree._factorList[frm]._node_seq) - set(self._JTree._factorList[frm]._node_seq).intersection(set(self._JTree._factorList[to]._node_seq))))
+           
+                    Ein[to].remove(frm)
+                    Eout[frm].remove(to)
+                    break
+            print self._JTree._msg
+            print "Eliminated :",list(set(self._JTree._factorList[frm]._node_seq) - set(self._JTree._factorList[frm]._node_seq).intersection(set(self._JTree._factorList[to]._node_seq)))
+            print "frm : ", clique_nodes[frm]
+            print "to : ", clique_nodes[to]
+            print "Ei :",Ein
+            print "Eo :",Eout, "\n"
 
         # Store JuntionTree in self._JTree
-        
         for node1 in clique_nodes:
             jt_node = self.JT_Node()
             jt_node._clique = node1
@@ -242,41 +313,14 @@ class Graph:
                 clique_index = i
                 break
         print " Clique index : " + str(clique_index)
-
-        MPA_tree = copy.deepcopy(self)
-        for k in range(len(MPA_tree._JTree._edgeList) - 1):
-            for i in range(len(MPA_tree._JTree._edgeList)):
-                if len(MPA_tree._JTree._edgeList[i]) == 1 and clique_index != i:
-                    dest_clique_index = MPA_tree._JTree._edgeList[i][0][0]
-                    print "To be eliminated : "
-                    print MPA_tree._JTree._nodeList[i]
-                    message_factor = MPA_tree._JTree._edgeList[i][0][2]
-                    print "message_factor._node_seq"
-                    print message_factor._node_seq
-                    print "MPA_tree._JTree._factorList[dest_clique_index]._node_seq"
-                    print MPA_tree._JTree._factorList[dest_clique_index]._node_seq
-                    print self._factors.keys()
-                    #MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor(message_factor._node_seq, MPA_tree._JTree._factorList[dest_clique_index]._node_seq, flag='m')
-                    MPA_tree._JTree._factorList[dest_clique_index] = self.multiply_factor_modified(message_factor, MPA_tree._JTree._factorList[dest_clique_index])
-                    # removing nodes and edges.
-                    MPA_tree._JTree._nodeList[i] = None
-                    MPA_tree._JTree._factorList[i] = None
-                    MPA_tree._JTree._edgeList[i] = []
-                    for j in range(len(MPA_tree._JTree._edgeList[dest_clique_index])):
-                        if MPA_tree._JTree._edgeList[dest_clique_index][j][0] == i:
-                            MPA_tree._JTree._edgeList[dest_clique_index].remove(MPA_tree._JTree._edgeList[dest_clique_index][j])
-                            break
-                    break
-        for m in MPA_tree._JTree._factorList:
-            if m is not None:
-                out_factor = m
-                if len(out_factor._node_seq) > len(node_list):
-                    result_factor = self.marginalize_factor(out_factor, list(set(out_factor._node_seq) - set(node_list)), flag='notmsg')
-                else:
-                    result_factor = out_factor
-
-        probability = result_factor._potentials / np.sum(result_factor._potentials)
-        return probability
+        msg_factor = self._JTree._factorList[clique_index]
+        for key in self._JTree._msg.keys():           
+            (frm,to) = key.split("_")
+            if  (int(to) == int(clique_index)):
+                print "Key :", key
+                msg_factor = self.multiply_factor_modified(msg_factor, self._JTree._msg[key])
+        output_factor = self.marginalize_factor(msg_factor, list(set(msg_factor._node_seq) - set(node_list)))
+        return output_factor._potentials / np.sum(output_factor._potentials)        
 
     def parseGraph(self, fileName):
         line_no = 1
@@ -351,56 +395,6 @@ class Graph:
         #self._factors[union_factor_key] = union_factor
         return union_factor
 
-    def multiply_factor(self, factor_node_list1, factor_node_list2, flag='n'):
-        if factor_node_list1 == []:
-            union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor_node_list2)]
-            return union_factor
-
-        if factor_node_list2 == []:
-            union_factor = self._factors[_concatenate_sorted_list_of_integer_strings(factor_node_list1)]
-            return union_factor
-
-        factor_key1 = _concatenate_sorted_list_of_integer_strings(factor_node_list1)
-        factor_key2 = _concatenate_sorted_list_of_integer_strings(factor_node_list2)
-
-        if flag == 'm':
-            union = list(self._JTree._messages[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
-        else:
-            union = list(self._factors[factor_key1]._node_set.union(self._factors[factor_key2]._node_set))
-        union.sort(key=int)
-        union_factor_key = _concatenate_sorted_list_of_integer_strings(union)
-        union_factor_cardinality_seq = []
-        union_indices = []
-
-        for i in union:
-            union_indices.append(range(self._nodes[i].cardinality))
-            union_factor_cardinality_seq.append(self._nodes[i].cardinality)
-
-        union_factor_potentials = np.zeros(tuple(union_factor_cardinality_seq))
-
-        # print "union_factor_potentials.shape..."
-        # print union_factor_potentials.shape
-        mask1 = _mask_node_list(union, self._factors[factor_key1]._node_seq)
-        mask2 = _mask_node_list(union, self._factors[factor_key2]._node_seq)
-        # print "Multiplying factors...."
-        # print union
-        # print mask1
-        # print mask2
-        for index in product(*union_indices):
-            if flag=='m':
-                union_factor_potentials[index] = (self._JTree._messages[factor_key1]._potentials[_masked_tuple(index, mask1)] *
-                                                  self._factors[factor_key2]._potentials[_masked_tuple(index, mask2)])
-            else:
-                union_factor_potentials[index] = (self._factors[factor_key1]._potentials[_masked_tuple(index, mask1)] *
-                                                  self._factors[factor_key2]._potentials[_masked_tuple(index, mask2)])
-
-
-        union_factor = self.Factor(union)
-        union_factor._potentials = union_factor_potentials
-        union_factor._cardinality_seq = union_factor_cardinality_seq
-        #self._factors[union_factor_key] = union_factor
-        return union_factor
-
     def marginalize_factor(self, original_factor, elimination_variables, flag='msg'):
         factor_node_list = original_factor._node_seq
         factor_key = _concatenate_sorted_list_of_integer_strings(factor_node_list)
@@ -416,8 +410,8 @@ class Graph:
         output_factor._potentials = np.sum(original_factor._potentials, tuple(sum_axes))
 
         #self._factors[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
-        if flag == 'msg':
-            self._JTree._messages[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
+        # if flag == 'msg':
+        #     self._JTree._messages[_concatenate_sorted_list_of_integer_strings(remaining_variables)] = output_factor
         return output_factor
 
     def triangulate(self):
@@ -442,16 +436,8 @@ class Graph:
         return G_tri
 
 
-    def printParameters(self):
-        # print self._num_nodes
-        # print self._num_edges
-        # print self._nodes['1'].neighbours
-
-        pass
-
 
 if __name__ == '__main__':
     G = Graph()
     G.parseGraph('TestCases/graph_1')
     G.parseFactor('TestCases/potentials_1')
-    G.printParameters()
