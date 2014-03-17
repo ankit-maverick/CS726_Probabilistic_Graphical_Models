@@ -345,7 +345,7 @@ class Graph:
 
         print "Largest Clique : ",largest_clique, "\n"
         
-        # Calculate Separatir Nodes
+        # Calculate Separator Nodes
         for e in self._JTree._edgeList:
             for i in e:
                 print "Cliques : ", self._JTree._nodeList[self._JTree._edgeList.index(e)]," & ", self._JTree._nodeList[i[0]], "  |   Separation Variables : ", self._JTree._nodeList[self._JTree._edgeList.index(e)].intersection(self._JTree._nodeList[i[0]])
@@ -486,5 +486,5 @@ class Graph:
 
 if __name__ == '__main__':
     G = Graph()
-    G.parseGraph('TestCases/graph_1')
-    G.parseFactor('TestCases/potentials_1')
+    G.parseGraph('graph')
+    G.parseFactor('potentials')
